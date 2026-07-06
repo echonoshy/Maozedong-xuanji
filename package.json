@@ -1,0 +1,21 @@
+{
+  "name": "maozedong-xuanji-reader",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "predev": "node scripts/build-content.mjs",
+    "dev": "vite --host 127.0.0.1",
+    "prebuild": "node scripts/build-content.mjs",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "marked": "^15.0.12"
+  },
+  "devDependencies": {
+    "vite": "^7.0.2",
+    "vitest": "^3.2.4"
+  }
+}

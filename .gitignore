@@ -1,0 +1,8 @@
+site/
+dist/
+node_modules/
+src/generated/
+public/content/
+.venv/
+.venv*/
+.DS_Store
