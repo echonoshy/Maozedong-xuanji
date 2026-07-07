@@ -41,7 +41,15 @@ function getVolume(article) {
   return library.volumes.find((volume) => volume.id === article.volumeId);
 }
 
-function renderHeader() {
+function renderHeader(options = {}) {
+  const navigation = options.archiveHome
+    ? '<a href="assets/maozedong-xuanji-5-volumes.pdf">PDF下载</a>'
+    : `
+        <a href="#volumes">卷册</a>
+        <a href="${articleUrl(firstArticle)}">阅读</a>
+        <a href="assets/maozedong-xuanji-5-volumes.pdf">PDF</a>
+      `;
+
   return `
     <header class="site-header">
       <a class="brand" href="#" aria-label="返回首页">
@@ -49,9 +57,7 @@ function renderHeader() {
         <span>毛泽东选集</span>
       </a>
       <nav class="top-nav" aria-label="主导航">
-        <a href="#volumes">卷册</a>
-        <a href="${articleUrl(firstArticle)}">阅读</a>
-        <a href="assets/maozedong-xuanji-5-volumes.pdf">PDF</a>
+        ${navigation}
       </nav>
     </header>
   `;
@@ -75,51 +81,105 @@ function renderSearchForm(query = "", variant = "hero") {
 
 function renderHome() {
   return `
-    ${renderHeader()}
-    <main class="home-shell">
-      <section class="hero" aria-labelledby="home-title">
-        <div class="hero-copy">
-          <h1 id="home-title">毛泽东选集</h1>
-          <p>五卷文献，按历史时期编排。为检索与长文阅读重新整理。</p>
-          ${renderSearchForm("", "hero")}
-          <div class="hero-actions">
-            <a class="button button-primary" href="${articleUrl(firstArticle)}">开始阅读</a>
-          </div>
+    ${renderHeader({ archiveHome: true })}
+    <main class="archive-shell">
+      <section class="archive-masthead" aria-labelledby="home-title">
+        <h1 id="home-title">毛泽东选集</h1>
+        <p>五卷文献，按历史时期编排。为检索、引用与长文阅读重新整理。</p>
+        <form class="archive-search" data-home-filter>
+          <input
+            type="search"
+            name="q"
+            autocomplete="off"
+            aria-label="搜索文献、标题、正文"
+            placeholder="搜索文献、标题、正文"
+          />
+          <button type="submit">搜索</button>
+        </form>
+        <div class="archive-stats" aria-label="文库统计">
+          <span>1925-1957</span>
+          <span>五卷</span>
+          <span data-home-count>${library.articles.length}篇</span>
         </div>
-        <aside class="reading-preview" aria-label="阅读预览">
-          <div class="preview-topline">
-            <span>阅读预览</span>
-            <span>第一卷</span>
-          </div>
-          <div class="preview-body">
-            <p>一九三七年七月</p>
-            <h2>实践论</h2>
-            <blockquote>人的认识，主要地依赖于物质的生产活动，逐渐地了解自然的现象、自然的性质、自然的规律性。</blockquote>
-          </div>
+        <aside class="archive-quick-index" aria-label="快速索引">
+          <h2>快速索引</h2>
+          ${library.volumes.map(renderArchiveQuickLink).join("")}
         </aside>
       </section>
 
-      <section class="volume-section" id="volumes" aria-labelledby="volumes-title">
-        <div class="section-heading">
-          <h2 id="volumes-title">按卷阅读</h2>
-        </div>
-        <div class="volume-list">
-          ${library.volumes.map(renderVolumeCard).join("")}
-        </div>
+      <section class="archive-volume-board" id="volumes" aria-label="卷册目录" data-home-volumes>
+        ${library.volumes.map((volume) => renderArchiveVolumeRow(volume, "")).join("")}
       </section>
+      <section class="archive-empty" data-home-empty>没有找到匹配的篇目。</section>
     </main>
   `;
 }
 
-function renderVolumeCard(volume) {
-  const firstVolumeArticle = articlesById.get(volume.articleIds[0]);
+function renderArchiveQuickLink(volume) {
+  return `
+    <a href="#${volume.id}">
+      <span>${escapeHtml(volume.label)}</span>
+      <span>${escapeHtml(volume.title)}</span>
+    </a>
+  `;
+}
+
+function normalizeQuery(value) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function articleMatchesQuery(article, query) {
+  if (!query) {
+    return true;
+  }
+
+  return article.searchText.includes(query) || String(article.date ?? "").toLowerCase().includes(query);
+}
+
+function highlightMatch(value, query) {
+  const text = String(value);
+
+  if (!query) {
+    return escapeHtml(text);
+  }
+
+  const index = text.toLowerCase().indexOf(query);
+
+  if (index < 0) {
+    return escapeHtml(text);
+  }
+
+  return `${escapeHtml(text.slice(0, index))}<mark>${escapeHtml(text.slice(index, index + query.length))}</mark>${escapeHtml(text.slice(index + query.length))}`;
+}
+
+function renderArchiveVolumeRow(volume, query) {
+  const articles = volume.articleIds
+    .map((id) => articlesById.get(id))
+    .filter((article) => article && articleMatchesQuery(article, query));
+
+  if (!articles.length) {
+    return "";
+  }
 
   return `
-    <a class="volume-card accent-${volume.accent}" href="${articleUrl(firstVolumeArticle)}">
-      <span class="volume-label">${escapeHtml(volume.label)}</span>
-      <strong>${escapeHtml(volume.title)}</strong>
-      <span>${escapeHtml(volume.period)} · ${volume.articleIds.length} 篇 · ${String(volume.start).padStart(3, "0")}-${String(volume.end).padStart(3, "0")}</span>
-    </a>
+    <article class="archive-volume-row" id="${volume.id}">
+      <div class="archive-volume-meta">
+        <h2>${escapeHtml(volume.label)}</h2>
+        <p>${escapeHtml(volume.title)}</p>
+        <span>${escapeHtml(volume.period)}<br>${volume.articleIds.length}篇</span>
+      </div>
+      <div class="archive-article-grid">
+        ${articles.map((article) => `
+          <a class="archive-article-link" href="${articleUrl(article)}">
+            <span class="archive-article-number">${String(article.number).padStart(3, "0")}</span>
+            <span>
+              ${highlightMatch(article.title, query)}
+              ${article.date ? `<small>${escapeHtml(article.date)}</small>` : ""}
+            </span>
+          </a>
+        `).join("")}
+      </div>
+    </article>
   `;
 }
 
@@ -206,6 +266,13 @@ function render() {
   }
 
   bindSearchForms();
+  bindHomeArchiveFilter();
+
+  if (route.view === "home" && /^#(volumes|volume-\d+)/.test(window.location.hash)) {
+    document.querySelector(window.location.hash)?.scrollIntoView();
+    return;
+  }
+
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
@@ -228,6 +295,44 @@ function bindSearchForms() {
       }
     });
   });
+}
+
+function bindHomeArchiveFilter() {
+  const form = document.querySelector("[data-home-filter]");
+  const volumesNode = document.querySelector("[data-home-volumes]");
+  const emptyNode = document.querySelector("[data-home-empty]");
+  const countNode = document.querySelector("[data-home-count]");
+  const input = form?.querySelector("input");
+
+  if (!form || !volumesNode || !emptyNode || !countNode || !input) {
+    return;
+  }
+
+  const update = () => {
+    const query = normalizeQuery(input.value);
+    let visibleCount = 0;
+
+    const html = library.volumes.map((volume) => {
+      const articles = volume.articleIds
+        .map((id) => articlesById.get(id))
+        .filter((article) => article && articleMatchesQuery(article, query));
+
+      visibleCount += articles.length;
+      return articles.length ? renderArchiveVolumeRow(volume, query) : "";
+    }).join("");
+
+    volumesNode.innerHTML = html;
+    volumesNode.style.display = visibleCount ? "block" : "none";
+    emptyNode.style.display = visibleCount ? "none" : "block";
+    countNode.textContent = query ? `${visibleCount}个结果` : `${library.articles.length}篇`;
+  };
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    update();
+  });
+
+  input.addEventListener("input", update);
 }
 
 window.addEventListener("hashchange", render);
